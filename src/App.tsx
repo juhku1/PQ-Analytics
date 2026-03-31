@@ -1015,15 +1015,15 @@ export default function App() {
                 ))}
               </div>
             </div>            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-              <button className="text-left" onClick={() => setActiveMetric('total_events')}>
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
+              <button className="text-left w-full" onClick={() => setActiveMetric('total_events')}>
                 <StatCard 
                   title="Total Events" 
                   value={data.summary.total_events.toLocaleString()} 
                   icon={Activity}
                 />
               </button>
-              <button className="text-left" onClick={() => setActiveMetric('unique_users')}>
+              <button className="text-left w-full" onClick={() => setActiveMetric('unique_users')}>
                 <StatCard 
                   title="Unique Users" 
                   value={data.summary.unique_users.toLocaleString()} 
@@ -1031,7 +1031,7 @@ export default function App() {
                 />
               </button>
               {data.summary.new_users !== undefined && (
-                <button className="text-left" onClick={() => setActiveMetric('new_users')}>
+                <button className="text-left w-full" onClick={() => setActiveMetric('new_users')}>
                   <StatCard 
                     title="New Users" 
                     value={data.summary.new_users.toLocaleString()} 
@@ -1040,7 +1040,7 @@ export default function App() {
                 </button>
               )}
               {data.summary.returning_users !== undefined && (
-                <button className="text-left" onClick={() => setActiveMetric('returning_users')}>
+                <button className="text-left w-full" onClick={() => setActiveMetric('returning_users')}>
                   <StatCard 
                     title="Returning Users" 
                     value={data.summary.returning_users.toLocaleString()} 
@@ -1048,7 +1048,7 @@ export default function App() {
                   />
                 </button>
               )}
-              <button className="text-left" onClick={() => setActiveMetric('avg_events_per_user')}>
+              <button className="text-left w-full" onClick={() => setActiveMetric('avg_events_per_user')}>
                 <StatCard 
                   title="Avg Events/User" 
                   value={data.summary.unique_users > 0 ? (data.summary.total_events / data.summary.unique_users).toFixed(1) : '0'} 
@@ -1056,7 +1056,7 @@ export default function App() {
                 />
               </button>
               {topEvent && (
-                <button className="text-left" onClick={() => setActiveMetric('top_event')}>
+                <button className="text-left w-full" onClick={() => setActiveMetric('top_event')}>
                   <StatCard 
                     title="Top Event" 
                     value={topEvent[0].replace(/_/g, ' ')} 
