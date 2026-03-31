@@ -458,9 +458,9 @@ const StatCard = ({ title, value, icon: Icon, trend }: { title: string, value: s
     <div className="flex justify-between items-start">
       <div>
         <p className="text-sm font-medium text-zinc-500 uppercase tracking-wider">{title}</p>
-        <h2 className="text-4xl font-bold mt-1 text-zinc-900 tracking-tight">{value}</h2>
+        <h2 className="text-3xl md:text-4xl font-bold mt-1 text-zinc-900 tracking-tight break-words">{value}</h2>
       </div>
-      <div className="p-2 bg-zinc-50 rounded-lg border border-zinc-100">
+      <div className="p-2 bg-zinc-50 rounded-lg border border-zinc-100 shrink-0">
         <Icon className="w-6 h-6 text-zinc-600" />
       </div>
     </div>
@@ -471,6 +471,33 @@ const StatCard = ({ title, value, icon: Icon, trend }: { title: string, value: s
     )}
   </Card>
 );
+
+type RangeKey = '1' | '7' | '30' | '365' | 'max';
+type MetricKey = 'total_events' | 'unique_users' | 'new_users' | 'returning_users' | 'avg_events_per_user' | 'top_event';
+
+const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
+  { key: '1', label: '1' },
+  { key: '7', label: '7' },
+  { key: '30', label: 'kk' },
+  { key: '365', label: 'vuosi' },
+  { key: 'max', label: 'max' },
+];
+
+function withDaysParam(rawUrl: string, range: RangeKey): string {
+  try {
+    const parsed = new URL(rawUrl);
+    if (range === 'max') parsed.searchParams.delete('days');
+    else parsed.searchParams.set('days', range);
+    return parsed.toString();
+  } catch {
+    const [base, query = ''] = rawUrl.split('?');
+    const params = new URLSearchParams(query);
+    if (range === 'max') params.delete('days');
+    else params.set('days', range);
+    const nextQuery = params.toString();
+    return nextQuery ? `${base}?${nextQuery}` : base;
+  }
+}
 
 export default function App() {
   const [projects, setProjects] = useState<SavedProject[]>([]);
@@ -484,6 +511,8 @@ export default function App() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState('');
+  const [selectedRange, setSelectedRange] = useState<RangeKey>('7');
+  const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
 
   const activeProject = useMemo(() => 
     projects.find(p => p.id === activeProjectId) || null
@@ -524,10 +553,11 @@ export default function App() {
     setLoading(true);
     setFetchError('');
     try {
+      const rangedApiUrl = withDaysParam(apiUrl, selectedRange);
       // Proxy route exists only in local Express dev server.
       const isLocalHost = typeof window !== 'undefined' &&
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-      const requestUrl = isLocalHost ? `/api/proxy?url=${encodeURIComponent(apiUrl)}` : apiUrl;
+      const requestUrl = isLocalHost ? `/api/proxy?url=${encodeURIComponent(rangedApiUrl)}` : rangedApiUrl;
 
       const response = await fetch(requestUrl);
       if (!response.ok) {
@@ -557,7 +587,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [apiUrl]);
+  }, [apiUrl, selectedRange]);
 
   useEffect(() => {
     if (activeProjectId) {
@@ -631,6 +661,7 @@ export default function App() {
   }, [data]);
 
   const topEvent = nonPageViewEvents[0] || null;
+  const topEventKey = topEvent?.[0] || null;
 
   const eventKeys = useMemo(() => {
     if (!data) return [];
@@ -692,6 +723,27 @@ export default function App() {
       return 0;
     });
   }, [data]);
+
+  const historyData = useMemo(() => {
+    if (!data) return [] as Array<Record<string, string | number>>;
+    const days = Object.keys(data.by_day).sort();
+    return days.map(day => {
+      const events: Record<string, number> = data.by_day[day] || {};
+      const totalEvents = Object.values(events).reduce((sum: number, val: number) => sum + val, 0);
+      const userStats = data.users_by_day?.[day] || { unique_users: 0, new_users: 0, returning_users: 0 };
+      const uniqueUsers = Number(userStats.unique_users || 0);
+      return {
+        day,
+        label: day.slice(5),
+        total_events: totalEvents,
+        unique_users: uniqueUsers,
+        new_users: userStats.new_users || 0,
+        returning_users: userStats.returning_users || 0,
+        avg_events_per_user: uniqueUsers > 0 ? totalEvents / uniqueUsers : 0,
+        top_event: topEventKey ? (events[topEventKey] || 0) : 0,
+      };
+    });
+  }, [data, topEventKey]);
 
   const COLORS = ['#18181b', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -946,44 +998,72 @@ export default function App() {
                   </span>
                 </div>
               </div>
+              <div className="flex items-center gap-2 bg-white border border-zinc-200 rounded-xl p-1 self-start">
+                {RANGE_OPTIONS.map(option => (
+                  <button
+                    key={option.key}
+                    onClick={() => setSelectedRange(option.key)}
+                    className={cn(
+                      'px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors',
+                      selectedRange === option.key
+                        ? 'bg-zinc-900 text-white'
+                        : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100'
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>            {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-              <StatCard 
-                title="Total Events" 
-                value={data.summary.total_events.toLocaleString()} 
-                icon={Activity}
-              />
-              <StatCard 
-                title="Unique Users" 
-                value={data.summary.unique_users.toLocaleString()} 
-                icon={Users}
-              />
-              {data.summary.new_users !== undefined && (
+              <button className="text-left" onClick={() => setActiveMetric('total_events')}>
                 <StatCard 
-                  title="New Users" 
-                  value={data.summary.new_users.toLocaleString()} 
+                  title="Total Events" 
+                  value={data.summary.total_events.toLocaleString()} 
+                  icon={Activity}
+                />
+              </button>
+              <button className="text-left" onClick={() => setActiveMetric('unique_users')}>
+                <StatCard 
+                  title="Unique Users" 
+                  value={data.summary.unique_users.toLocaleString()} 
                   icon={Users}
                 />
+              </button>
+              {data.summary.new_users !== undefined && (
+                <button className="text-left" onClick={() => setActiveMetric('new_users')}>
+                  <StatCard 
+                    title="New Users" 
+                    value={data.summary.new_users.toLocaleString()} 
+                    icon={Users}
+                  />
+                </button>
               )}
               {data.summary.returning_users !== undefined && (
-                <StatCard 
-                  title="Returning Users" 
-                  value={data.summary.returning_users.toLocaleString()} 
-                  icon={RefreshCw}
-                />
+                <button className="text-left" onClick={() => setActiveMetric('returning_users')}>
+                  <StatCard 
+                    title="Returning Users" 
+                    value={data.summary.returning_users.toLocaleString()} 
+                    icon={RefreshCw}
+                  />
+                </button>
               )}
-              <StatCard 
-                title="Avg Events/User" 
-                value={data.summary.unique_users > 0 ? (data.summary.total_events / data.summary.unique_users).toFixed(1) : '0'} 
-                icon={BarChart3}
-              />
-              {topEvent && (
+              <button className="text-left" onClick={() => setActiveMetric('avg_events_per_user')}>
                 <StatCard 
-                  title="Top Event" 
-                  value={topEvent[0].replace(/_/g, ' ')} 
-                  icon={TrendingUp}
-                  trend={`${topEvent[1]} occurrences`}
+                  title="Avg Events/User" 
+                  value={data.summary.unique_users > 0 ? (data.summary.total_events / data.summary.unique_users).toFixed(1) : '0'} 
+                  icon={BarChart3}
                 />
+              </button>
+              {topEvent && (
+                <button className="text-left" onClick={() => setActiveMetric('top_event')}>
+                  <StatCard 
+                    title="Top Event" 
+                    value={topEvent[0].replace(/_/g, ' ')} 
+                    icon={TrendingUp}
+                    trend={`${topEvent[1]} occurrences`}
+                  />
+                </button>
               )}
               <StatCard 
                 title="Active Days" 
@@ -1230,6 +1310,102 @@ export default function App() {
                 </table>
               </div>
             </Card>
+
+            <AnimatePresence>
+              {activeMetric && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+                  onClick={() => setActiveMetric(null)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 12, scale: 0.98 }}
+                    transition={{ duration: 0.2 }}
+                    className="w-full max-w-4xl bg-white rounded-2xl border border-zinc-200 shadow-xl p-6"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-6">
+                      <div>
+                        <h3 className="text-xl font-bold text-zinc-900">
+                          {activeMetric === 'total_events' && 'Total Events'}
+                          {activeMetric === 'unique_users' && 'Unique Users'}
+                          {activeMetric === 'new_users' && 'New Users'}
+                          {activeMetric === 'returning_users' && 'Returning Users'}
+                          {activeMetric === 'avg_events_per_user' && 'Avg Events/User'}
+                          {activeMetric === 'top_event' && 'Top Event'}
+                        </h3>
+                        <p className="text-sm text-zinc-500 mt-1">
+                          {activeMetric === 'top_event' && topEventKey
+                            ? `Daily history for: ${topEventKey.replace(/_/g, ' ')}`
+                            : 'Daily history'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setActiveMetric(null)}
+                        className="px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="h-[340px] w-full min-w-0">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={220}>
+                        <LineChart data={historyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
+                          <XAxis
+                            dataKey="label"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 12, fill: '#71717a' }}
+                            interval="preserveStartEnd"
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 12, fill: '#71717a' }}
+                            width={40}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#fff',
+                              border: '1px solid #e4e4e7',
+                              borderRadius: '8px',
+                            }}
+                            formatter={(value: number) => {
+                              if (activeMetric === 'avg_events_per_user') return [Number(value).toFixed(1), 'Value'];
+                              return [value, 'Value'];
+                            }}
+                            labelFormatter={(label, payload) => {
+                              const day = payload?.[0]?.payload?.day;
+                              return day || label;
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey={
+                              activeMetric === 'total_events' ? 'total_events' :
+                              activeMetric === 'unique_users' ? 'unique_users' :
+                              activeMetric === 'new_users' ? 'new_users' :
+                              activeMetric === 'returning_users' ? 'returning_users' :
+                              activeMetric === 'avg_events_per_user' ? 'avg_events_per_user' :
+                              'top_event'
+                            }
+                            stroke={activeMetric === 'top_event' ? '#f59e0b' : '#18181b'}
+                            strokeWidth={3}
+                            dot={{ r: 3 }}
+                            activeDot={{ r: 5 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </main>
