@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   LineChart, Line, Legend, Cell, PieChart, Pie, LabelList
 } from 'recharts';
 import { 
@@ -471,6 +471,51 @@ const StatCard = ({ title, value, icon: Icon, trend }: { title: string, value: s
     )}
   </Card>
 );
+
+const ChartFrame = ({
+  className,
+  minHeight,
+  children,
+}: {
+  className?: string;
+  minHeight: number;
+  children: (size: { width: number; height: number }) => React.ReactNode;
+}) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setSize({
+        width: Math.max(0, Math.floor(rect.width)),
+        height: Math.max(0, Math.floor(rect.height)),
+      });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(() => updateSize());
+    observer.observe(container);
+    window.addEventListener('orientationchange', updateSize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('orientationchange', updateSize);
+    };
+  }, []);
+
+  const isReady = size.width > 0 && size.height > 0;
+
+  return (
+    <div ref={containerRef} className={cn('w-full min-w-0', className)} style={{ minHeight }}>
+      {isReady ? children(size) : null}
+    </div>
+  );
+};
 
 type RangeKey = '1' | '7' | '30' | '365' | 'max';
 type MetricKey = 'total_events' | 'unique_users' | 'new_users' | 'returning_users' | 'avg_events_per_user' | 'top_event';
@@ -1096,9 +1141,9 @@ export default function App() {
                   </div>
                 }
               >
-                <div className="h-[450px] w-full min-w-0">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={320}>
-                    <LineChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+                <ChartFrame className="h-[450px]" minHeight={320}>
+                  {({ width, height }) => (
+                    <LineChart width={width} height={height} data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
                       <XAxis 
                         dataKey="date" 
@@ -1205,16 +1250,17 @@ export default function App() {
                         );
                       })}
                     </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                  )}
+                </ChartFrame>
               </Card>
 
               {/* Event Breakdown (Pie Chart) */}
               <Card title="Event Distribution" icon={PieChartIcon} className="min-w-0">
                 <div className="h-[450px] w-full min-w-0 flex flex-col">
                   <div className="flex-1 min-w-0">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
-                      <PieChart>
+                    <ChartFrame minHeight={240}>
+                      {({ width, height }) => (
+                        <PieChart width={width} height={height}>
                         <Pie
                           data={eventBreakdownData}
                           cx="50%"
@@ -1229,8 +1275,9 @@ export default function App() {
                           ))}
                         </Pie>
                         <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                        </PieChart>
+                      )}
+                    </ChartFrame>
                   </div>
                   <div className="mt-4 space-y-3">
                     {eventBreakdownData.map((event, index) => (
@@ -1352,9 +1399,9 @@ export default function App() {
                       </button>
                     </div>
 
-                    <div className="h-[340px] w-full min-w-0">
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={220}>
-                        <LineChart data={historyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                    <ChartFrame className="h-[340px]" minHeight={220}>
+                      {({ width, height }) => (
+                        <LineChart width={width} height={height} data={historyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
                           <XAxis
                             dataKey="label"
@@ -1400,8 +1447,8 @@ export default function App() {
                             activeDot={{ r: 5 }}
                           />
                         </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+                      )}
+                    </ChartFrame>
                   </motion.div>
                 </motion.div>
               )}
