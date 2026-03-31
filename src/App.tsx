@@ -995,7 +995,7 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Activity Chart */}
               <Card 
-                className="lg:col-span-2" 
+                className="lg:col-span-2 min-w-0" 
                 title="Activity Trends" 
                 icon={Activity}
                 extra={
@@ -1016,8 +1016,8 @@ export default function App() {
                   </div>
                 }
               >
-                <div className="h-[450px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[450px] w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={320}>
                     <LineChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
                       <XAxis 
@@ -1130,10 +1130,10 @@ export default function App() {
               </Card>
 
               {/* Event Breakdown (Pie Chart) */}
-              <Card title="Event Distribution" icon={PieChartIcon}>
-                <div className="h-[450px] w-full flex flex-col">
-                  <div className="flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
+              <Card title="Event Distribution" icon={PieChartIcon} className="min-w-0">
+                <div className="h-[450px] w-full min-w-0 flex flex-col">
+                  <div className="flex-1 min-w-0">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                       <PieChart>
                         <Pie
                           data={eventBreakdownData}
