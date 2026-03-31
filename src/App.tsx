@@ -524,9 +524,12 @@ export default function App() {
     setLoading(true);
     setFetchError('');
     try {
-      // Use local proxy to bypass CORS
-      const proxyUrl = `/api/proxy?url=${encodeURIComponent(apiUrl)}`;
-      const response = await fetch(proxyUrl);
+      // Proxy route exists only in local Express dev server.
+      const isLocalHost = typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const requestUrl = isLocalHost ? `/api/proxy?url=${encodeURIComponent(apiUrl)}` : apiUrl;
+
+      const response = await fetch(requestUrl);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Failed to fetch analytics data. Check your API URL and network connection.');
