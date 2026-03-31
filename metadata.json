@@ -1,0 +1,5 @@
+{
+  "name": "Service Analytics",
+  "description": "A secure analytics dashboard for service report data.",
+  "requestFramePermissions": []
+}
