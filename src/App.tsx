@@ -453,8 +453,41 @@ const Card = ({ children, className, title, icon: Icon, extra }: { children: Rea
   </motion.div>
 );
 
-const StatCard = ({ title, value, icon: Icon, trend }: { title: string, value: string | number, icon: any, trend?: string }) => (
-  <Card className="flex flex-col justify-between">
+const MiniSparkline = ({ values }: { values?: number[] }) => {
+  if (!values || values.length < 2) return null;
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * 100;
+      const y = 100 - ((value - min) / range) * 100;
+      return `${x},${y}`;
+    })
+    .join(' ');
+
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
+      <polyline
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+    </svg>
+  );
+};
+
+const StatCard = ({ title, value, icon: Icon, trend, sparkline }: { title: string, value: string | number, icon: any, trend?: string, sparkline?: number[] }) => (
+  <Card className="relative overflow-hidden flex flex-col justify-between">
+    {sparkline && (
+      <div className="absolute inset-x-3 bottom-2 h-10 text-zinc-300/60 pointer-events-none">
+        <MiniSparkline values={sparkline} />
+      </div>
+    )}
     <div className="flex justify-between items-start">
       <div>
         <p className="text-sm font-medium text-zinc-500 uppercase tracking-wider">{title}</p>
@@ -790,6 +823,15 @@ export default function App() {
     });
   }, [data, topEventKey]);
 
+  const metricSeries = useMemo(() => ({
+    total_events: historyData.map(d => Number(d.total_events ?? 0)),
+    unique_users: historyData.map(d => Number(d.unique_users ?? 0)),
+    new_users: historyData.map(d => Number(d.new_users ?? 0)),
+    returning_users: historyData.map(d => Number(d.returning_users ?? 0)),
+    avg_events_per_user: historyData.map(d => Number(d.avg_events_per_user ?? 0)),
+    top_event: historyData.map(d => Number(d.top_event ?? 0)),
+  }), [historyData]);
+
   const COLORS = ['#18181b', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   if (!isConfigured || showSettings) {
@@ -1066,6 +1108,7 @@ export default function App() {
                   title="Total Events" 
                   value={data.summary.total_events.toLocaleString()} 
                   icon={Activity}
+                  sparkline={metricSeries.total_events}
                 />
               </button>
               <button className="text-left w-full" onClick={() => setActiveMetric('unique_users')}>
@@ -1073,6 +1116,7 @@ export default function App() {
                   title="Unique Users" 
                   value={data.summary.unique_users.toLocaleString()} 
                   icon={Users}
+                  sparkline={metricSeries.unique_users}
                 />
               </button>
               {data.summary.new_users !== undefined && (
@@ -1081,6 +1125,7 @@ export default function App() {
                     title="New Users" 
                     value={data.summary.new_users.toLocaleString()} 
                     icon={Users}
+                    sparkline={metricSeries.new_users}
                   />
                 </button>
               )}
@@ -1090,6 +1135,7 @@ export default function App() {
                     title="Returning Users" 
                     value={data.summary.returning_users.toLocaleString()} 
                     icon={RefreshCw}
+                    sparkline={metricSeries.returning_users}
                   />
                 </button>
               )}
@@ -1098,6 +1144,7 @@ export default function App() {
                   title="Avg Events/User" 
                   value={data.summary.unique_users > 0 ? (data.summary.total_events / data.summary.unique_users).toFixed(1) : '0'} 
                   icon={BarChart3}
+                  sparkline={metricSeries.avg_events_per_user}
                 />
               </button>
               {topEvent && (
@@ -1107,6 +1154,7 @@ export default function App() {
                     value={topEvent[0].replace(/_/g, ' ')} 
                     icon={TrendingUp}
                     trend={`${topEvent[1]} occurrences`}
+                    sparkline={metricSeries.top_event}
                   />
                 </button>
               )}
@@ -1364,7 +1412,7 @@ export default function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+                  className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4"
                   onClick={() => setActiveMetric(null)}
                 >
                   <motion.div
@@ -1372,10 +1420,10 @@ export default function App() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 12, scale: 0.98 }}
                     transition={{ duration: 0.2 }}
-                    className="w-full max-w-4xl bg-white rounded-2xl border border-zinc-200 shadow-xl p-6"
+                    className="w-[min(94vw,56rem)] max-h-[90vh] overflow-y-auto bg-white rounded-2xl border border-zinc-200 shadow-xl p-4 sm:p-6"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-start justify-between gap-4 mb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
                       <div>
                         <h3 className="text-xl font-bold text-zinc-900">
                           {activeMetric === 'total_events' && 'Total Events'}
@@ -1399,7 +1447,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    <ChartFrame className="h-[340px]" minHeight={220}>
+                    <ChartFrame className="h-[260px] sm:h-[340px]" minHeight={220}>
                       {({ width, height }) => (
                         <LineChart width={width} height={height} data={historyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
