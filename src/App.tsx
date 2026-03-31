@@ -583,7 +583,7 @@ export default function App() {
   const [tempUrl, setTempUrl] = useState('');
   const [tempName, setTempName] = useState('');
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'guide'>('dashboard');
+  const [showGuideInline, setShowGuideInline] = useState(false);
   
   const [showSettings, setShowSettings] = useState(false);
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -725,6 +725,31 @@ export default function App() {
   };
 
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({ total: true });
+
+  useEffect(() => {
+    if (!activeProjectId) {
+      setVisibleKeys({ total: true });
+      return;
+    }
+
+    try {
+      const raw = localStorage.getItem(`analytics_visible_keys_${activeProjectId}`);
+      if (!raw) {
+        setVisibleKeys({ total: true });
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Record<string, boolean>;
+      setVisibleKeys(parsed && typeof parsed === 'object' ? parsed : { total: true });
+    } catch {
+      setVisibleKeys({ total: true });
+    }
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    if (!activeProjectId) return;
+    localStorage.setItem(`analytics_visible_keys_${activeProjectId}`, JSON.stringify(visibleKeys));
+  }, [activeProjectId, visibleKeys]);
 
   const isPageView = (name: string) => {
     const n = name.toLowerCase().replace(/_/g, ' ').trim();
@@ -989,64 +1014,41 @@ export default function App() {
     <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans">
       {/* Header */}
       <header className="bg-white border-b border-zinc-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center">
-                <BarChart3 className="text-white w-5 h-5" />
-              </div>
-              <div className="relative group">
-                <button 
-                  className="flex items-center gap-2 text-left"
-                  onClick={() => setShowSettings(true)}
-                >
-                  <div>
-                    <h1 className="font-bold text-lg tracking-tight leading-none">{activeProject?.name || 'Service Analytics'}</h1>
-                    {data?.project && data.project !== 'all' && (
-                      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-0.5">
-                        ID: {data.project}
-                      </p>
-                    )}
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-zinc-400 group-hover:text-zinc-900 transition-colors" />
-                </button>
-              </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center shrink-0">
+              <BarChart3 className="text-white w-5 h-5" />
+            </div>
+            <div className="relative group min-w-0">
+              <button
+                className="flex items-center gap-2 text-left min-w-0"
+                onClick={() => setShowSettings(true)}
+              >
+                <div className="min-w-0">
+                  <h1 className="font-bold text-base sm:text-lg tracking-tight leading-none truncate">{activeProject?.name || 'Service Analytics'}</h1>
+                  {data?.project && data.project !== 'all' && (
+                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-0.5 truncate">
+                      ID: {data.project}
+                    </p>
+                  )}
+                </div>
+                <ChevronDown className="w-4 h-4 text-zinc-400 group-hover:text-zinc-900 transition-colors shrink-0" />
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-zinc-100 p-1 rounded-xl mr-4">
-              <button 
-                onClick={() => setActiveTab('dashboard')}
-                className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
-                  activeTab === 'dashboard' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-900"
-                )}
-              >
-                <BarChart3 className="w-4 h-4" />
-                Dashboard
-              </button>
-              <button 
-                onClick={() => setActiveTab('guide')}
-                className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
-                  activeTab === 'guide' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-900"
-                )}
-              >
-                <BookOpen className="w-4 h-4" />
-                Setup Guide
-              </button>
-            </div>
-            <button 
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
               onClick={fetchData}
               disabled={loading}
-              className="p-2 text-zinc-500 hover:bg-zinc-100 rounded-lg transition-colors disabled:opacity-50"
+              className="h-11 w-11 flex items-center justify-center text-zinc-500 hover:bg-zinc-100 rounded-lg transition-colors disabled:opacity-50"
               title="Refresh Data"
             >
               <RefreshCw className={cn("w-5 h-5", loading && "animate-spin")} />
             </button>
-            <button 
+            <button
               onClick={() => setShowSettings(true)}
-              className="p-2 text-zinc-500 hover:bg-zinc-100 rounded-lg transition-colors"
+              className="h-11 w-11 flex items-center justify-center text-zinc-500 hover:bg-zinc-100 rounded-lg transition-colors"
               title="Settings"
             >
               <Settings className="w-5 h-5" />
@@ -1056,9 +1058,7 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'guide' ? (
-          <SetupGuide />
-        ) : fetchError ? (
+        {fetchError ? (
           <div className="bg-red-50 border border-red-100 rounded-xl p-6 text-red-600 flex items-center gap-3">
             <AlertCircle className="w-6 h-6" />
             <div>
@@ -1102,6 +1102,7 @@ export default function App() {
                 ))}
               </div>
             </div>            {/* Stats Grid */}
+
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
               <button className="text-left w-full" onClick={() => setActiveMetric('total_events')}>
                 <StatCard 
@@ -1405,6 +1406,33 @@ export default function App() {
                 </table>
               </div>
             </Card>
+
+            <div className="bg-white border border-zinc-200 rounded-xl p-3 sm:p-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-zinc-900">Setup Guide</p>
+                <p className="text-xs text-zinc-500 truncate">Ohjeet integraation pystytykseen dashboardin alaosassa.</p>
+              </div>
+              <button
+                onClick={() => setShowGuideInline(prev => !prev)}
+                className="px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 shrink-0 flex items-center gap-2"
+              >
+                <BookOpen className="w-4 h-4" />
+                {showGuideInline ? 'Piilota' : 'Avaa'}
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {showGuideInline && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-6"
+                >
+                  <SetupGuide />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {activeMetric && (
